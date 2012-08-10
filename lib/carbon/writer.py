@@ -36,29 +36,28 @@ agg_schemas = loadAggregationSchemas()
 CACHE_SIZE_LOW_WATERMARK = settings.MAX_CACHE_SIZE * 0.95
 
 class BasePersister(object):
-    def writeDataPoints(self):
-        pass
+  def get_dbinfo(self, metric):
+    return ""
+
+  def pre_get_datapoints_check(self, metric):
+    return True
+
+  def create_db(self, metric):
+    pass
+
+  def update_many(self, metric, datapoints, dbIdentifier):
+    pass
 
 class WhisperPersister(BasePersister):
-    def writeDataPoints(self):
-        writeCachedDataPoints()
 
-def optimalWriteOrder():
-  "Generates metrics with the most cached values first and applies a soft rate limit on new metrics"
-  global lastCreateInterval
-  global createCount
-  metrics = MetricCache.counts()
-
-  t = time.time()
-  metrics.sort(key=lambda item: item[1], reverse=True) # by queue size, descending
-  log.msg("Sorted %d cache queues in %.6f seconds" % (len(metrics), time.time() - t))
-
-  for metric, queueSize in metrics:
-    if state.cacheTooFull and MetricCache.size < CACHE_SIZE_LOW_WATERMARK:
-      events.cacheSpaceAvailable()
-
+  def get_dbinfo(self, metric):
     dbFilePath = getFilesystemPath(metric)
-    dbFileExists = exists(dbFilePath)
+    return (dbFilePath, exists(dbFilePath))
+
+  def pre_retrieve_metric_check(self, metric):
+    dbinfo = self.get_dbinfo(metric)
+    dbFilePath = dbInfo[0]
+    dbFileExists = dbInfo[1]
 
     if not dbFileExists:
       createCount += 1
@@ -76,6 +75,57 @@ def optimalWriteOrder():
         except KeyError:
           pass
 
+        return False
+
+    return True
+
+  def create_db(self, metric):
+    archiveConfig = None
+    xFilesFactor, aggregationMethod = None, None
+    
+    for schema in schemas:
+      if schema.matches(metric):
+        log.creates('new metric %s matched schema %s' % (metric, schema.name))
+        archiveConfig = [archive.getTuple() for archive in schema.archives]
+        break
+
+    for schema in agg_schemas:
+      if schema.matches(metric):
+        log.creates('new metric %s matched aggregation schema %s' % (metric, schema.name))
+        xFilesFactor, aggregationMethod = schema.archives
+        break
+
+    if not archiveConfig:
+      raise Exception("No storage schema matched the metric '%s', check your storage-schemas.conf file." % metric)
+
+    dbDir = dirname(dbFilePath)
+    os.system("mkdir -p -m 755 '%s'" % dbDir)
+
+    log.creates("creating database file %s (archive=%s xff=%s agg=%s)" % 
+                (dbFilePath, archiveConfig, xFilesFactor, aggregationMethod))
+    whisper.create(dbFilePath, archiveConfig, xFilesFactor, aggregationMethod, settings.WHISPER_SPARSE_CREATE)
+    os.chmod(dbFilePath, 0755)
+
+  def update_many(self, metric, datapoints, dbIdentifier):
+    dbFilePath = dbIdentifier
+    whisper.update_many(dbFilePath, datapoints)
+
+def optimalWriteOrder():
+  "Generates metrics with the most cached values first and applies a soft rate limit on new metrics"
+  global lastCreateInterval
+  global createCount
+  metrics = MetricCache.counts()
+
+  t = time.time()
+  metrics.sort(key=lambda item: item[1], reverse=True) # by queue size, descending
+  log.msg("Sorted %d cache queues in %.6f seconds" % (len(metrics), time.time() - t))
+
+  for metric, queueSize in metrics:
+    if state.cacheTooFull and MetricCache.size < CACHE_SIZE_LOW_WATERMARK:
+      events.cacheSpaceAvailable()
+
+    # Let our persister do its own check, and ignore the metric if needed.
+    if not persister.pre_get_datapoints_check(metric):
         continue
 
     try: # metrics can momentarily disappear from the MetricCache due to the implementation of MetricCache.store()
@@ -84,7 +134,11 @@ def optimalWriteOrder():
       log.msg("MetricCache contention, skipping %s update for now" % metric)
       continue # we simply move on to the next metric when this race condition occurs
 
-    yield (metric, datapoints, dbFilePath, dbFileExists)
+    dbInfo = persister.get_dbinfo(metric)
+    dbIdentifier = dbInfo[0]
+    dbExists = dbInfo[1]
+
+    yield (metric, datapoints, dbIdentifier, dbExists)
 
 def writeCachedDataPoints():
   "Write datapoints until the MetricCache is completely empty"
@@ -94,44 +148,21 @@ def writeCachedDataPoints():
   while MetricCache:
     dataWritten = False
 
-    for (metric, datapoints, dbFilePath, dbFileExists) in optimalWriteOrder():
+    #for (metric, datapoints, dbFilePath, dbFileExists) in optimalWriteOrder():
+    for (metric, datapoints, dbIdentifier, dbExists) in optimalWriteOrder():
       dataWritten = True
 
-      if not dbFileExists:
-        archiveConfig = None
-        xFilesFactor, aggregationMethod = None, None
-
-        for schema in schemas:
-          if schema.matches(metric):
-            log.creates('new metric %s matched schema %s' % (metric, schema.name))
-            archiveConfig = [archive.getTuple() for archive in schema.archives]
-            break
-
-        for schema in agg_schemas:
-          if schema.matches(metric):
-            log.creates('new metric %s matched aggregation schema %s' % (metric, schema.name))
-            xFilesFactor, aggregationMethod = schema.archives
-            break
-
-        if not archiveConfig:
-          raise Exception("No storage schema matched the metric '%s', check your storage-schemas.conf file." % metric)
-
-        dbDir = dirname(dbFilePath)
-        os.system("mkdir -p -m 755 '%s'" % dbDir)
-
-        log.creates("creating database file %s (archive=%s xff=%s agg=%s)" % 
-                    (dbFilePath, archiveConfig, xFilesFactor, aggregationMethod))
-        whisper.create(dbFilePath, archiveConfig, xFilesFactor, aggregationMethod, settings.WHISPER_SPARSE_CREATE)
-        os.chmod(dbFilePath, 0755)
+      if not dbExists:
+        persister.create_db(metric)
         instrumentation.increment('creates')
 
       try:
         t1 = time.time()
-        whisper.update_many(dbFilePath, datapoints)
+        persister.update_many(metric, datapoints, dbIdentifier)
         t2 = time.time()
         updateTime = t2 - t1
       except:
-        log.msg("Error writing to %s" % (dbFilePath))
+        log.msg("Error writing to %s" % (dbIdentifier))
         log.err()
         instrumentation.increment('errors')
       else:
@@ -158,12 +189,13 @@ def writeCachedDataPoints():
       time.sleep(0.1)
 
 #TODO - Later let us modify which persister to use from the config files.
-persister = WhisperPersister()
+from pgpersister import PostgresqlPersister
+persister = PostgresqlPersister()
 
 def writeForever():
   while reactor.running:
     try:
-      persister.writeDataPoints()
+      writeCachedDataPoints()
     except:
       log.err()
 
