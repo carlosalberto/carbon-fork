@@ -1,6 +1,12 @@
 TODO for out Postgresql persister (pgpersister.py)
 ---------------------------------------------------------------------------
 
+* URGENT: move the postgresql database info out of pgpersister.py,
+  as well as exposing the module selection in config, so we could
+  have something like:
+
+	PERSISTER_BACKEND='postgresql'
+
 * Smarter re-connection: Right now we close the connection
   postgresql as soon as any query fails, and try to open it
   again. This may not be true in all the cases, as a a bad
@@ -13,3 +19,10 @@ TODO for out Postgresql persister (pgpersister.py)
   to store data to its complicated set of tables, so may need
   to do the same if at some point we need better performance
   (Not important right now).
+
+EXTRA:
+
+* We may want to create a module exposing the complete stats,
+  which would include both the data persisted to postgresql and
+  the cached ones. Straightforward to do. Take a look at the
+  carbon.cache.MetricCache and its usage in writer.py.
