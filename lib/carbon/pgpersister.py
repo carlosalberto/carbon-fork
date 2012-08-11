@@ -44,14 +44,21 @@ PG_BACKEND_SETTINGS = {
 
 class PostgresqlPersister(BasePersister):
     def __init__ (self):
-        self.reset()
+        self._connection_alive = False
 
-    def reset(self):
+    def check_alive(self):
+        if self._connection_alive:
+            return
+
+        if hasattr(self, '_connection'): #Try to close any previous connection
+            self._connection.close()
+
         connection = psycopg2.connect(database=PG_BACKEND_SETTINGS["dbname"],
                         host=PG_BACKEND_SETTINGS["host"],
                         user=PG_BACKEND_SETTINGS["user"],
                         password=PG_BACKEND_SETTINGS["password"])
         self._connection = connection
+        self._connection_alive = True
 
     #Our persister takes for granted the databases are
     #created already (which is different to Whisper, which creates
@@ -80,17 +87,24 @@ class PostgresqlPersister(BasePersister):
         'metric' is the name of the param ('my.value')
         'datapoints' is a list of tuples, containing the timestamp and value
         '''
+
         log.msg("updating metric %s using the postgresql persister" % (metric,))
         try:
+            self.check_alive()
+
             for datapoint in datapoints:
                 self.update_one(metric, datapoint)
 
             self._connection.commit()
-        except:
-            log.msg("failed to insert/update stats into postgresql")
+        except pyscopg2.Warning, e:
+            log.msg("received a warning while inserting values: %s" % (e,))
+        except Error, e:
+            log.msg("failed to insert/update stats into postgresql: %s" % (e,))
             log.err()
+            self._connection_alive = False #Tell to retry/reconnect.
 
     def __del__(self):
-        if hasattr(self, '_connection') and self._connection:
+        if self._connection_alive and hasattr(self, '_connection'):
             self._connection.close()
+            self._connection_alive = False
 
