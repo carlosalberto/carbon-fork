@@ -1,0 +1,15 @@
+TODO for out Postgresql persister (pgpersister.py)
+---------------------------------------------------------------------------
+
+* Smarter re-connection: Right now we close the connection
+  postgresql as soon as any query fails, and try to open it
+  again. This may not be true in all the cases, as a a bad
+  query, disk full, and so forth.
+* Take a deeper look to know whether we need a connection per
+  thread: Based on the code I read, I don't think we need to
+  provide such scenario, but a deeper look and test wouldn't
+  hurt.
+* Use stored procedures and consume them: Reconnoiter uses them
+  to store data to its complicated set of tables, so may need
+  to do the same if at some point we need better performance
+  (Not important right now).

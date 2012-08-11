@@ -25,16 +25,6 @@ from carbon.persister import BasePersister
 
 import psycopg2
 
-
-'''
-The most important thing to think about, right now,
-is how to handle the connection. Should we keep one per thread?
-Should we keep it open?
-ALSO: what to do when the connection gets refused? Besides logging it, of
-course.
-Let us somewhere specify the credentials por the persister (dbinfo, that is).
-'''
-
 PG_BACKEND_SETTINGS = {
     "dbname" : "senzari_stats",
     "user" : "senzari_dev",
