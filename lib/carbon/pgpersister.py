@@ -21,7 +21,7 @@ from carbon.cache import MetricCache
 from carbon.storage import getFilesystemPath, loadStorageSchemas, loadAggregationSchemas
 from carbon.conf import settings
 from carbon import log, events, instrumentation
-from carbon.writer import BasePersister
+from carbon.persister import BasePersister
 
 import psycopg2
 
