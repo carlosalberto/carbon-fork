@@ -91,6 +91,6 @@ class PostgresqlPersister(BasePersister):
             log.err()
 
     def __del__(self):
-        if hasattr(self, '_connection') and self.connection:
-            self.connection.close()
+        if hasattr(self, '_connection') and self._connection:
+            self._connection.close()
 
