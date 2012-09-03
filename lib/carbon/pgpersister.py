@@ -58,13 +58,13 @@ class PostgresqlPersister(BasePersister):
         Gets the database info related to a metric, as well as whether it
         exists already or not (as a tuple)
         '''
-        return ('core_stats', True)
+        return ('latest_stats', True)
 
     def update_one(self, metric, datapoint):
         value = datapoint[1]
         timestamp = datetime.datetime.fromtimestamp(int(datapoint[0]))
         sql_stmt =  """
-            INSERT into core_stats(name, "time", value)
+            INSERT into latest_stats(name, tstamp, value)
             VALUES ('%s', '%s', %f);
         """
         cursor = self._connection.cursor()
