@@ -63,6 +63,7 @@ class PostgresqlPersister(BasePersister):
     def update_one(self, metric, datapoint):
         value = datapoint[1]
         timestamp = datetime.datetime.fromtimestamp(int(datapoint[0]))
+        log.msg("INSERTING %s" % metric)
         sql_stmt =  """
             INSERT into latest_stats(name, tstamp, value)
             VALUES ('%s', '%s', %f);
@@ -86,9 +87,9 @@ class PostgresqlPersister(BasePersister):
                 self.update_one(metric, datapoint)
 
             self._connection.commit()
-        except pyscopg2.Warning, e:
+        except psycopg2.Warning, e:
             log.msg("received a warning while inserting values: %s" % (e,))
-        except Error, e:
+        except psycopg2.Error, e:
             log.msg("failed to insert/update stats into postgresql: %s" % (e,))
             log.err()
             self._connection_alive = False #Tell to retry/reconnect.
