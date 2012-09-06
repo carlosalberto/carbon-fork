@@ -120,6 +120,6 @@ def condense():
 def main():
     condense()
 
-gf __name__ == "__main__":
+if __name__ == "__main__":
     main()
 
