@@ -79,6 +79,13 @@ class PostgresqlPersister(BasePersister):
         'datapoints' is a list of tuples, containing the timestamp and value
         '''
 
+        '''
+        Ignore the metrics with _90 for now (not sure what they do,
+        besides repeating the info under some scenarios
+        '''
+        if metric.endswith("_90"):
+            return
+
         log.msg("updating metric %s using the postgresql persister" % (metric,))
         try:
             self.check_alive()
