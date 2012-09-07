@@ -60,6 +60,9 @@ def condense():
             max_value = x[5]
             is_counter = is_metric_counter(name)
 
+            # TODO - Support everything else besides counters.
+            continue
+
             sql_daily = """
             SELECT
              average,
