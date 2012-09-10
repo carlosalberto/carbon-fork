@@ -40,10 +40,7 @@ def condense():
         SELECT
          name,
          date_trunc('day', tstamp) as day,
-         SUM(value),
-         AVG(value) as average,
-         MIN(value) as min,
-         MAX(value) as max
+         SUM(value)
         FROM latest_stats
          GROUP BY name, day
         """
@@ -55,20 +52,14 @@ def condense():
             name = x[0]
             day = x[1]
             sum_value = x[2]
-            average = x[3]
-            min_value = x[4]
-            max_value = x[5]
             is_counter = is_metric_counter(name)
 
             # TODO - Support everything else besides counters.
-            continue
+            if not is_counter:
+                continue
 
             sql_daily = """
-            SELECT
-             average,
-             min,
-             max,
-             counter
+            SELECT value
             FROM daily_stats
             WHERE
              name=%s AND day=%s
@@ -82,30 +73,25 @@ def condense():
                 # Retrieve the our single row.
                 for x in daily_data:
                     # FIXME: Do a correct average handling ;)
-                    average = (x[0] + average) / 2.0
-                    min_value = min(min_value, x[1])
-                    max_value = max(max_value, x[2])
                     if (is_counter):
-                        sum_value = sum_value + x[3]
+                        sum_value = sum_value + x[0]
 
                 sql_daily_insert = """
                 UPDATE daily_stats
-                 SET average=%s, min=%s, max=%s, counter=%s
+                 SET value=%s
                  WHERE name=%s AND day=%s
                 """
                 cursor3 = connection.cursor()
-                cursor.execute(sql_daily_insert, [average, min_value, max_value,
-                                                  sum_value,
+                cursor.execute(sql_daily_insert, [sum_value,
                                                   name, day])
             else:
                 sql_daily_insert = """
                 INSERT
-                 INTO daily_stats(name, day, average, min, max, counter)
-                 VALUES(%s, %s, %s, %s, %s, %s)
+                 INTO daily_stats(name, day, value)
+                 VALUES(%s, %s, %s)
                 """
                 cursor3 = connection.cursor()
-                cursor.execute(sql_daily_insert, [name, day, average,
-                                                  min_value, max_value,
+                cursor.execute(sql_daily_insert, [name, day,
                                                   sum_value])
 
         clear_sql = """
