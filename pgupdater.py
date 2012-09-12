@@ -2,6 +2,8 @@
 import os
 import psycopg2
 
+from statshandling import *
+
 PG_BACKEND_SETTINGS = {
     "dbname" : "senzari_stats",
     "user" : "senzari_dev",
@@ -16,10 +18,6 @@ def open_connection():
                         password=PG_BACKEND_SETTINGS['password'])
         return connection
 
-def is_metric_counter(metric):
-    parts = metric.split('.', 1)
-    return parts[0].endswith('_counts')
-
 '''
 Our condense phase consist in retrieving data from our latest_stats table,
 which is supposed to be cleaned/consumed by this module hourly, and then
@@ -33,66 +31,82 @@ case we keep an extra column, which keeps track of the actual count.
 Finally, we clean the latest_stats table.
 '''
 def condense():
+    stats_cache = {}
+
     try:
         connection = open_connection()
 
         sql = """
-        SELECT
-         name,
-         date_trunc('day', tstamp) as day,
-         SUM(value)
-        FROM latest_stats
-         GROUP BY name, day
+            SELECT
+                name,
+                tstamp,
+                value
+            FROM latest_stats
+            ORDER BY 2 ASC
         """
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
         for x in data:
-            # sum_value is only used with counters.
-            name = x[0]
-            day = x[1]
-            sum_value = x[2]
-            is_counter = is_metric_counter(name)
+            name = x[0].strip()
+            tstamp = x[1]
+            value = x[2]
 
-            # TODO - Support everything else besides counters.
-            if not is_counter:
+            stat_type, stat_key = get_stat_info(name)
+            if stat_type == StatObject.IgnoredType:
                 continue
 
-            sql_daily = """
-            SELECT value
-            FROM daily_stats
-            WHERE
-             name=%s AND day=%s
-            """
-            cursor2 = connection.cursor()
-            cursor2.execute(sql_daily, [name, day])
-            daily_data = cursor2.fetchall()
+            stat_obj = stats_cache.get(stat_key, None)
+            if stat_obj == None:
+                stat_obj = create_stat_obj(stat_key, stat_type)
+                stats_cache[stat_key] = stat_obj
 
-            if len(daily_data) > 0:
+            stat_obj.process_value(name, value, tstamp)
 
-                # Retrieve the our single row.
-                for x in daily_data:
-                    # FIXME: Do a correct average handling ;)
-                    if (is_counter):
-                        sum_value = sum_value + x[0]
-
-                sql_daily_insert = """
-                UPDATE daily_stats
-                 SET value=%s
-                 WHERE name=%s AND day=%s
-                """
-                cursor3 = connection.cursor()
-                cursor.execute(sql_daily_insert, [sum_value,
-                                                  name, day])
+        for stat_key, stat_obj in stats_cache.iteritems():
+            stat_obj.evaluate()
+            stat_type = stat_obj.get_stat_type()
+            if stat_type == StatObject.CounterType:
+                name = "stats.counters.%s" % stat_obj.name
             else:
-                sql_daily_insert = """
-                INSERT
-                 INTO daily_stats(name, day, value)
-                 VALUES(%s, %s, %s)
+                name = "stat.timers.%s" % stat_obj.name
+
+            for day, value in stat_obj.get_values().iteritems():
+                sql_daily = """
+                SELECT value
+                FROM daily_stats
+                WHERE name=%s and day=%s
                 """
-                cursor3 = connection.cursor()
-                cursor.execute(sql_daily_insert, [name, day,
-                                                  sum_value])
+                cursor2 = connection.cursor()
+                cursor2.execute(sql_daily, [name, day])
+                daily_data = cursor2.fetchall()
+
+                if len(daily_data) > 0:
+                    # Retrieve the our single row.
+                    for x in daily_data:
+                        stored_value = x[0]
+                        
+                    if stat_type == StatObject.CounterType:
+                        value = value + stored_value
+                    elif stat_type == StatObject.TimerType:
+                        value = (value + stored_value) / 2.0
+
+                    sql_daily_insert = """
+                    UPDATE daily_stats
+                    SET value=%s
+                    WHERE name=%s AND day=%s
+                    """
+                    cursor3 = connection.cursor()
+                    cursor.execute(sql_daily_insert, [value, name, day])
+                else:
+                    sql_daily_insert = """
+                    INSERT
+                    INTO daily_stats(name, day, value)
+                    VALUES(%s, %s, %s)
+                    """
+                    cursor3 = connection.cursor()
+                    cursor.execute(sql_daily_insert, [name, day,
+                                                      value])
 
         clear_sql = """
             DELETE FROM latest_stats
