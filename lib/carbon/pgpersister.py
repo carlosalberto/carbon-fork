@@ -81,9 +81,11 @@ class PostgresqlPersister(BasePersister):
 
         '''
         Ignore the metrics with _90 for now (not sure what they do,
-        besides repeating the info under some scenarios
+        besides repeating the info under some scenarios). Do the same
+        with *.[upper|lower|mean], as we do not use them for now.
         '''
-        if metric.endswith("_90"):
+        if metric.endswith("_90") or metric.endswith(".upper") or
+            metric.endswith(".lower") or metric.endswith("mean"):
             return
 
         log.msg("updating metric %s using the postgresql persister" % (metric,))
