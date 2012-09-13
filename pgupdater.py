@@ -2,20 +2,14 @@
 import os
 import psycopg2
 
+from pgbackendsettings import *
 from statshandling import *
 
-PG_BACKEND_SETTINGS = {
-    "dbname" : "senzari_stats",
-    "user" : "senzari_dev",
-    "password" : "senzari_dev",
-    "host" : "localhost"
-}
-
 def open_connection():
-        connection = psycopg2.connect(database=PG_BACKEND_SETTINGS['dbname'],
-                        host=PG_BACKEND_SETTINGS['host'],
-                        user=PG_BACKEND_SETTINGS['user'],
-                        password=PG_BACKEND_SETTINGS['password'])
+        connection = psycopg2.connect(database=PGBACKEND_SETTINGS['dbname'],
+                        host=PGBACKEND_SETTINGS['host'],
+                        user=PGBACKEND_SETTINGS['user'],
+                        password=PGBACKEND_SETTINGS['password'])
         return connection
 
 '''

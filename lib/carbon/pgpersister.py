@@ -23,14 +23,9 @@ from carbon.conf import settings
 from carbon import log, events, instrumentation
 from carbon.persister import BasePersister
 
-import psycopg2
+from pgbackendsettings import *
 
-PG_BACKEND_SETTINGS = {
-    "dbname" : "senzari_stats",
-    "user" : "senzari_dev",
-    "password" : "senzari_dev",
-    "host" : "localhost"
-}
+import psycopg2
 
 class PostgresqlPersister(BasePersister):
     def __init__ (self):
