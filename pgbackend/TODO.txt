@@ -1,0 +1,52 @@
+Postgresql persister (lib/carbon/pgpersister.py)
+---------------------------------------------------------------------------
+
+* URGENT: move the postgresql database info out of pgpersister.py,
+  as well as exposing the module selection in config, so we could
+  have something like:
+
+	PERSISTER_BACKEND='postgresql'
+
+* Smarter re-connection: Right now we close the connection
+  postgresql as soon as any query fails, and try to open it
+  again. This may not be true in all the cases, as a a bad
+  query, disk full, and so forth.
+* Take a deeper look to know whether we need a connection per
+  thread: Based on the code I read, I don't think we need to
+  provide such scenario, but a deeper look and test wouldn't
+  hurt.
+* Use stored procedures and consume them: Reconnoiter uses them
+  to store data to its complicated set of tables, so may need
+  to do the same if at some point we need better performance
+  (Not important right now).
+* Filtering options by providing a file -or info in a schema- to let us
+  ignore some values we are not interested at all (such,
+  carbon.a.value.there, etc)
+
+EXTRA:
+
+* We may want to create a module exposing the complete stats,
+  which would include both the data persisted to postgresql and
+  the cached ones. Straightforward to do. Take a look at the
+  carbon.cache.MetricCache and its usage in writer.py.
+
+Postgres condenser (pgcondenser.py)
+---------------------------------------------------------------------------
+
+* Add a table to contain information about the kind of stat we have, such
+  'my.counter' -> 'counter', 'my.timer' -> 'timer', etc.
+  Right now we are using the statsd naming scheme (statsd.timers.my.timer,
+  statsd.counters.my.counter), which is not exactly the best, IMHO.
+* Maybe we could add another table, containing the total number of timings
+  we get, and improve the average, or just keep track of how many we got.
+* The statshandling.py module saves, by default, every thing on a day basis,
+  but it would be nice to have it set somewhere in a property or similar,
+  so we could specify through a parameter we want the data being saved monthly/
+  yearly/5-hourly, etc.
+* A pass on statshandling.py to make it more pythonic -opposed to my C/C#
+  background- wouldn't hurt neither.
+* Right now pgcondenser.py is designed to run as a crond module, but I'm
+  thinking we could write is as a server module, just like carbon-cache.py
+  does.
+* Consume the carbon's schema info?
+* Write a README for people -besides me- wanting to test this module out.
