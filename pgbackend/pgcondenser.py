@@ -63,7 +63,7 @@ def condense():
             if stat_type == StatObject.CounterType:
                 name = "stats.counters.%s" % stat_obj.name
             else:
-                name = "stat.timers.%s" % stat_obj.name
+                name = "stats.timers.%s" % stat_obj.name
 
             for day, value in stat_obj.get_values().iteritems():
                 sql_daily = """
