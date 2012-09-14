@@ -22,6 +22,8 @@ Postgresql persister (lib/carbon/pgpersister.py)
 * Filtering options by providing a file -or info in a schema- to let us
   ignore some values we are not interested at all (such,
   carbon.a.value.there, etc)
+* Create a well defined sql file and schema to create the database
+  needed.
 
 EXTRA:
 
