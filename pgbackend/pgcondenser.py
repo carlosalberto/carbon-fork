@@ -59,7 +59,7 @@ def condense():
 
         for stat_key, stat_obj in stats_cache.iteritems():
             stat_obj.evaluate()
-            stat_type = stat_obj.get_stat_type()
+            stat_type = stat_obj.stat_type
             if stat_type == StatObject.CounterType:
                 name = "stats.counters.%s" % stat_obj.name
             else:

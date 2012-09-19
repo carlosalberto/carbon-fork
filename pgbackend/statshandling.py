@@ -50,7 +50,8 @@ class StatObject(object):
     def __init__(self, name):
         self.name = name
 
-    def get_stat_type(self):
+    @property
+    def stat_type(self):
         raise Exception("StatObject cannot be used. Use a derived class instead.")
 
     def get_values(self):
@@ -82,7 +83,8 @@ class CounterObject(StatObject):
 
         self.day_counters = {}
 
-    def get_stat_type(self):
+    @property
+    def stat_type(self):
         return StatObject.CounterType
 
     def process_value(self, value_name, value, tstamp):
@@ -102,6 +104,7 @@ class TimerInfo(object):
         self.count = -1
         self.sum = -1
 
+    @property
     def is_complete(self):
         return self.count > -1 and self.sum > -1
 
@@ -113,7 +116,8 @@ class TimerObject(StatObject):
         self.day_timers = {}
         self.is_evaluted = False
 
-    def get_stat_type(self):
+    @property
+    def stat_type(self):
         return StatObject.TimerType
 
     def process_value(self, value_name, value, tstamp):
@@ -142,7 +146,7 @@ class TimerObject(StatObject):
 
             count = sum = 0
             for stat_tstamp, stat_info in stat_list.iteritems():
-                if not stat_info.is_complete():
+                if not stat_info.is_complete:
                     ''' Discard incomplete stats '''
                     continue
 
