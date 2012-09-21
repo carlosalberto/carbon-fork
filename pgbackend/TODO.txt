@@ -52,3 +52,4 @@ Postgres condenser (pgcondenser.py)
   does.
 * Consume the carbon's schema info?
 * Write a README for people -besides me- wanting to test this module out.
+* Tests!
