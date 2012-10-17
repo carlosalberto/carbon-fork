@@ -5,6 +5,8 @@ import psycopg2
 from pgbackendsettings import *
 from statshandling import *
 
+DEFAULT_MAX_OLD = '3 months'
+
 def open_connection():
         connection = psycopg2.connect(database=PGBACKEND_SETTINGS['dbname'],
                         host=PGBACKEND_SETTINGS['host'],
@@ -107,6 +109,14 @@ def condense():
         """
         clear_cursor = connection.cursor()
         clear_cursor.execute(clear_sql)
+
+        # Clear anything older than 3 months.
+        clear_old_sql = """
+            DELETE FROM daily_stats
+            WHERE day < now() - interval %s
+        """
+        clear_cursor2 = connection.cursor()
+        clear_cursor2.execute(clear_old_sql, (DEFAULT_MAX_OLD))
 
         connection.commit()
     except psycopg2.Warning, e:
