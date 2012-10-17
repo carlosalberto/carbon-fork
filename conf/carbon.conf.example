@@ -278,3 +278,7 @@ MAX_AGGREGATION_INTERVALS = 5
 # seconds. Set CARBON_METRIC_INTERVAL to 0 to disable instrumentation
 # CARBON_METRIC_PREFIX = carbon
 # CARBON_METRIC_INTERVAL = 60
+
+# By default, the whisper database is used as persister.
+# Set this to 'pgbackend' to use a postgres based one.
+CARBON_PERSISTER = "whisper"
