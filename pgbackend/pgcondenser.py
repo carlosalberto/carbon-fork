@@ -116,7 +116,7 @@ def condense():
             WHERE day < now() - interval %s
         """
         clear_cursor2 = connection.cursor()
-        clear_cursor2.execute(clear_old_sql, (DEFAULT_MAX_OLD))
+        clear_cursor2.execute(clear_old_sql, (DEFAULT_MAX_OLD,))
 
         connection.commit()
     except psycopg2.Warning, e:
