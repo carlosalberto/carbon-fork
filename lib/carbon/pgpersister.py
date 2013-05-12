@@ -36,7 +36,10 @@ class PostgresqlPersister(BasePersister):
             return
 
         if hasattr(self, '_connection'): #Try to close any previous connection
-            self._connection.close()
+            try:
+                self._connection.close()
+            except:
+                pass
 
         connection = psycopg2.connect(database=PGBACKEND_SETTINGS["dbname"],
                         host=PGBACKEND_SETTINGS["host"],
