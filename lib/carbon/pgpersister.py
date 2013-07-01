@@ -61,14 +61,14 @@ class PostgresqlPersister(BasePersister):
     def update_one(self, metric, datapoint):
         value = datapoint[1]
         timestamp = datetime.datetime.fromtimestamp(int(datapoint[0]))
-        log.msg("INSERTING %s" % metric)
+        #log.msg("INSERTING %s" % metric)
         sql_stmt =  """
             INSERT into latest_stats(name, tstamp, value)
             VALUES ('%s', '%s', %f);
         """
         cursor = self._connection.cursor()
         cursor.execute(sql_stmt % (metric, timestamp, value))
-        log.msg("successfully inserted value to metric %s" % (metric,))
+        #log.msg("successfully inserted value to metric %s" % (metric,))
 
     def update_many(self, metric, datapoints, dbIdentifier):
         '''
@@ -86,18 +86,21 @@ class PostgresqlPersister(BasePersister):
             metric.endswith(".lower") or metric.endswith("mean"):
             return
 
-        log.msg("updating metric %s using the postgresql persister" % (metric,))
+        log.msg("Updating metric %s using the postgresql persister" % (metric,))
         try:
             self.check_alive()
 
+            counter = 0
             for datapoint in datapoints:
                 self.update_one(metric, datapoint)
+                counter++
 
             self._connection.commit()
+            log.msg('Inserted %s data points.' % (counter))
         except psycopg2.Warning, e:
-            log.msg("received a warning while inserting values: %s" % (e,))
+            log.msg("Received a warning while inserting values: %s" % (e,))
         except psycopg2.Error, e:
-            log.msg("failed to insert/update stats into postgresql: %s" % (e,))
+            log.msg("Failed to insert/update stats into postgresql: %s" % (e,))
             log.err()
             self._connection_alive = False #Tell to retry/reconnect.
 
