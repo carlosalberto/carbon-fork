@@ -61,6 +61,11 @@ class PostgresqlPersister(BasePersister):
     def update_one(self, metric, datapoint):
         value = datapoint[1]
         timestamp = datetime.datetime.fromtimestamp(int(datapoint[0]))
+
+        # Don't pollute the database with empty counters (totally useless).
+        if metric.startswith('stats_counts') and value == 0:
+            return
+
         #log.msg("INSERTING %s" % metric)
         sql_stmt =  """
             INSERT into latest_stats(name, tstamp, value)
@@ -93,7 +98,7 @@ class PostgresqlPersister(BasePersister):
             counter = 0
             for datapoint in datapoints:
                 self.update_one(metric, datapoint)
-                counter++
+                counter = counter + 1
 
             self._connection.commit()
             log.msg('Inserted %s data points.' % (counter))
