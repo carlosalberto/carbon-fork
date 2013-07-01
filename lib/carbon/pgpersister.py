@@ -82,7 +82,7 @@ class PostgresqlPersister(BasePersister):
         besides repeating the info under some scenarios). Do the same
         with *.[upper|lower|mean], as we do not use them for now.
         '''
-        if metric.endswith("_90") or metric.endswith(".upper") or
+        if metric.endswith("_90") or metric.endswith(".upper") or \
             metric.endswith(".lower") or metric.endswith("mean"):
             return
 
