@@ -1,0 +1,142 @@
+diff --git a/stats.js b/stats.js
+index a68d4b1..e8b0456 100644
+--- a/stats.js
++++ b/stats.js
+@@ -15,11 +15,18 @@ var timers = {
+   "statsd.packet_process_time": []
+ };
+ var gauges = {};
++var updatableMetrics = {
++  "counters": {},
++  "timers": {},
++  "gauges": {}
++};
+ var pctThreshold = null;
+ var debugInt, flushInterval, keyFlushInt, server, mgmtServer;
+ var startup_time = Math.round(new Date().getTime() / 1000);
+ var backendEvents = new events.EventEmitter();
+ 
++var expireThreshold, collectInterval;
++
+ // Load and init the backend from the backends/ directory.
+ function loadBackend(config, name) {
+   var backendmod = require(name);
+@@ -63,6 +70,46 @@ function flushMetrics() {
+   backendEvents.emit('flush', time_stamp, metrics_hash);
+ };
+ 
++function collectUpdatableMetrics() {
++  var tmp = [];
++  for (key in updatableMetrics['timers'])
++    for (id in updatableMetrics['timers'][key]) {
++      var values = updatableMetrics['timers'][key][id];
++      tmp.push([key, id, values[1]]); // tstamp
++    }
++
++  tmp.sort(function(a, b) { // Sort by timestamp
++    var t1 = a[2];
++    var t2 = b[2];
++    return t1 > t2 ? 1 : (t2 > t1 ? -1 : 0);
++  });
++
++  var threshold = new Date().getTime() - expireThreshold;
++  //util.log (' expire threshold: ' + threshold);
++
++  if (tmp.length == 0)
++    util.log('Nothing to collect/analize');
++
++  for (var i = 0; i < tmp.length; i++) {
++    var key = tmp[i][0];
++    var id = tmp[i][1];
++    var tstamp = tmp[i][2];
++    if (tstamp > threshold)
++      break;
++
++    // send to timers.
++    var value = updatableMetrics['timers'][key][id][0];
++    if (! timers[key])
++      timers[key] = []
++
++    timers[key].push(value);
++    util.log('Collecting ' + key + ':' + id + ' = ' + value);
++    
++    // then clean.
++    delete updatableMetrics['timers'][key][id];
++  }
++}
++
+ var stats = {
+   messages: {
+     last_msg_seen: startup_time,
+@@ -85,6 +132,9 @@ config.configFile(process.argv[2], function (config, oldConfig) {
+     }, config.debugInterval || 10000);
+   }
+ 
++  collectInterval = config.collectInterval || 10000;
++  expireThreshold = config.expireThreshold || 60000;
++
+   if (server === undefined) {
+ 
+     // key counting
+@@ -97,7 +147,10 @@ config.configFile(process.argv[2], function (config, oldConfig) {
+       for (midx in metrics) {
+         if (config.dumpMessages) { util.log(metrics[midx].toString()); }
+         var bits = metrics[midx].toString().split(':');
+-        var key = bits.shift()
++        var values = bits.shift().split('#'); // counter key and optional id
++        var id = values.length > 1 ? values[1] : null;
++
++        var key = values[0]
+                       .replace(/\s+/g, '_')
+                       .replace(/\//g, '-')
+                       .replace(/[^a-zA-Z_\-0-9\.]/g, '');
+@@ -122,21 +175,39 @@ config.configFile(process.argv[2], function (config, oldConfig) {
+               stats['messages']['bad_lines_seen']++;
+               continue;
+           }
++
+           if (fields[1].trim() == "ms") {
++            var value = Number(fields[0] || 0);
++            if (id) {
++              if (! updatableMetrics['timers'][key])
++                updatableMetrics['timers'][key] = {};
++
++              util.log ("Updating " + key + ":" + id + " = " + value + ", tstamp: " + new Date().getTime());
++              updatableMetrics['timers'][key][id] = [value, new Date().getTime()];
++              continue;
++            }
++
+             if (! timers[key]) {
+               timers[key] = [];
+             }
+-            timers[key].push(Number(fields[0] || 0));
++            timers[key].push(value);
+           } else if (fields[1].trim() == "g") {
+             gauges[key] = Number(fields[0] || 0);
+           } else {
+             if (fields[2] && fields[2].match(/^@([\d\.]+)/)) {
+               sampleRate = Number(fields[2].match(/^@([\d\.]+)/)[1]);
+             }
++
++            var value = Number(fields[0] || 1) * (1 / sampleRate);
++            if (id) {
++              updatableMetrics['counters'][key] = value;
++              continue;
++            }
++
+             if (! counters[key]) {
+               counters[key] = 0;
+             }
+-            counters[key] += Number(fields[0] || 1) * (1 / sampleRate);
++            counters[key] += Number(value);
+           }
+         }
+       }
+@@ -273,6 +344,7 @@ config.configFile(process.argv[2], function (config, oldConfig) {
+ 
+     // Setup the flush timer
+     var flushInt = setInterval(flushMetrics, flushInterval);
++    var collectInt = setInterval(collectUpdatableMetrics, collectInterval);
+ 
+     if (keyFlushInterval > 0) {
+       var keyFlushPercent = Number((config.keyFlush && config.keyFlush.percent) || 100);
