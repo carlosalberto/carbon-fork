@@ -168,7 +168,9 @@ class TimerObject(StatObject):
                 count = count + stat_info.count
                 sum = sum + stat_info.sum
 
-            values[stat_day] = sum / count
+            # Don't use empty data.
+            if count > 0:
+                values[stat_day] = sum / count
 
         self.values = values
         self.is_evaluated = True
