@@ -39,6 +39,7 @@ Finally, we clean the latest_stats table.
 '''
 def condense():
     stats_cache = {}
+    time_barrier = datetime.datetime.now()
 
     try:
         connection = open_connection()
@@ -122,9 +123,10 @@ def condense():
         log('Clearing temporary and old data...')
         clear_sql = """
             DELETE FROM latest_stats
+            WHERE tstamp <= %s
         """
         clear_cursor = connection.cursor()
-        clear_cursor.execute(clear_sql)
+        clear_cursor.execute(clear_sql, (time_barrier,))
 
         # Clear anything older than 3 months.
         clear_old_sql = """
