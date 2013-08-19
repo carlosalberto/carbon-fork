@@ -75,7 +75,7 @@ class StatObject(object):
         '''
         return None
 
-    def process_value(self, value_name, value, tstamp):
+    def process_value(self, value_name, value, date):
         '''
         Process a specific metric corresponding to a
         specific stat (such my.timer.sum or my.timer.low, for
@@ -101,8 +101,8 @@ class CounterObject(StatObject):
     def stat_type(self):
         return StatObject.CounterType
 
-    def process_value(self, value_name, value, tstamp):
-        value_date = tstamp.date()
+    def process_value(self, value_name, value, date):
+        value_date = date
         day_value = self.day_counters.get(value_date, None)
         if day_value == None:
             self.day_counters[value_date] = value
@@ -134,11 +134,11 @@ class TimerObject(StatObject):
     def stat_type(self):
         return StatObject.TimerType
 
-    def process_value(self, value_name, value, tstamp):
+    def process_value(self, value_name, value, date):
         if not value_name.endswith("count") and not value_name.endswith("sum"):
             raise Exception("Invalid metric. It should end with 'count' or 'sum':%s" % value_name)
 
-        value_date = tstamp.date()
+        value_date = date
         stat_list = self.day_timers.get(value_date, None)
         if stat_list == None:
             stat_list = {}

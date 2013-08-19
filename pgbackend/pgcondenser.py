@@ -60,7 +60,7 @@ def condense():
         data = cursor.fetchall()
         for x in data:
             name = x[0].strip()
-            tstamp = x[1]
+            day = x[1]
             value = x[2]
 
             stat_type, stat_key = get_stat_info(name)
@@ -76,7 +76,7 @@ def condense():
                 stat_obj = create_stat_obj(stat_key, stat_type)
                 stats_cache[stat_key] = stat_obj
 
-            stat_obj.process_value(name, value, tstamp)
+            stat_obj.process_value(name, value, day)
 
         log('Proccessing done. About to save the stats.')
         for stat_key, stat_obj in stats_cache.iteritems():
