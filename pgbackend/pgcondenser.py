@@ -67,6 +67,10 @@ def condense():
             if stat_type == StatObject.IgnoredType:
                 continue
 
+            # Disable timers for now.
+            if stat_type == StatObject.TimerType:
+                continue
+
             stat_obj = stats_cache.get(stat_key, None)
             if stat_obj == None:
                 stat_obj = create_stat_obj(stat_key, stat_type)
